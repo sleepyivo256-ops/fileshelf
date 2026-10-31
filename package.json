@@ -1,0 +1,28 @@
+{
+  "name": "fileshelf",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cross-env NODE_OPTIONS=--use-system-ca next dev",
+    "build": "next build",
+    "build:worker": "cross-env NODE_OPTIONS=--use-system-ca opennextjs-cloudflare build",
+    "deploy": "cross-env NODE_OPTIONS=--use-system-ca wrangler deploy",
+    "start": "cross-env NODE_OPTIONS=--use-system-ca next start",
+    "seed": "node src/lib/seed-cli.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^12.11.1",
+    "jose": "^5.9.6",
+    "next": "^15.1.6",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.15",
+    "cross-env": "^10.1.0",
+    "wrangler": "^4.156.0"
+  }
+}

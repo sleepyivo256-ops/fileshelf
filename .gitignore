@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.open-next/
+data/*.db
+data/*.db-*
+data/files/
+data/uploads/
+.env.local

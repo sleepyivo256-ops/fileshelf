@@ -23,6 +23,7 @@ export async function PUT(req, { params }) {
     return Response.json({ error: 'Title, a valid category and price are required.' }, { status: 400 });
   }
 
+  const isFree = price === 0;
   try {
     let coverPath = product.cover_path;
     if (cover && typeof cover !== 'string' && cover.size > 0) {
@@ -37,6 +38,10 @@ export async function PUT(req, { params }) {
       filePath = saved.relPath;
       fileName = saved.fileName;
       fileSize = saved.size;
+    } else if (isFree) {
+      filePath = '';
+      fileName = '';
+      fileSize = 0;
     }
 
     await execute(`UPDATE products SET title = ?, description = ?, category = ?, price_ugx = ?, file_format = ?,

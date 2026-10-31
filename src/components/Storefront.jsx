@@ -59,7 +59,7 @@ export default function Storefront() {
   const shown = filtered.slice(0, visible);
 
   const openProduct = (p) => setModal({ type: 'product', product: p });
-  const buyNow = (p) => setModal({ type: 'checkout', product: p });
+  const buyNow = (p) => p.price_ugx === 0 ? setModal({ type: 'free-download', product: p }) : setModal({ type: 'checkout', product: p });
   const closeModal = () => setModal(null);
 
   const afterAuth = (u) => { setUser(u); setModal({ type: 'orders' }); };
@@ -182,7 +182,7 @@ export default function Storefront() {
                     <div className="card-cat">{p.category} · {p.file_format}</div>
                     <div className="card-price">{ugx(p.price_ugx)}</div>
                     <button className="btn" onClick={(e) => { e.stopPropagation(); buyNow(p); }}>
-                      Buy Now
+                      {p.price_ugx === 0 ? 'Download' : 'Buy Now'}
                     </button>
                   </div>
                 </article>
@@ -216,8 +216,14 @@ export default function Storefront() {
           </div>
           <p className="pd-desc">{modal.product.description || 'A practical digital resource from FileShelf.'}</p>
           <div className="pd-price">{ugx(modal.product.price_ugx)}</div>
-          <button className="btn btn-block" onClick={() => buyNow(modal.product)}>Buy Now <ArrowRight /></button>
-          <p className="form-note">Pay securely with MTN MoMo or Airtel Money. Download instantly after payment.</p>
+          {modal.product.price_ugx === 0 ? (
+            <button className="btn btn-block" onClick={() => setModal({ type: 'free-download', product: modal.product })}>
+              Download now <ArrowRight />
+            </button>
+          ) : (
+            <button className="btn btn-block" onClick={() => buyNow(modal.product)}>Buy Now <ArrowRight /></button>
+          )}
+          <p className="form-note">{modal.product.price_ugx === 0 ? 'Free resource — download instantly.' : 'Pay securely with MTN MoMo or Airtel Money. Download instantly after payment.'}</p>
         </Modal>
       )}
 
@@ -240,6 +246,10 @@ export default function Storefront() {
           onResolved={(result) => setModal({ type: 'payment', result })}
           onError={showToast}
         />
+      )}
+
+      {modal?.type === 'free-download' && (
+        <FreeDownloadModal product={modal.product} onClose={closeModal} />
       )}
 
       {modal?.type === 'auth' && (
@@ -275,6 +285,48 @@ export default function Storefront() {
   );
 }
 
+function FreeDownloadModal({ product, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const download = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/download/free', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: product.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Download failed.'); setBusy(false); return; }
+      const a = document.createElement('a');
+      a.href = data.url;
+      a.download = true;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      onClose();
+    } catch {
+      setError('Network error. Please try again.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <h3>Download {product.title}</h3>
+      <p className="form-note" style={{ textAlign: 'left', margin: '4px 0 16px' }}>
+        This is a free resource. Click below to download it directly to your phone.
+      </p>
+      {error && <div className="form-error">{error}</div>}
+      <button className="btn btn-block" disabled={busy} onClick={download}>
+        {busy ? 'Preparing download...' : 'Download now'}
+      </button>
+    </Modal>
+  );
+}
+
 function TemplateIconSmall() {
   const I = CATEGORY_ICONS.Templates;
   return <I size={18} />;
@@ -297,8 +349,6 @@ function CheckoutModal({ product, user, guestEmail, onClose, onInitiated, onErro
     email: user?.email || guestEmail || '',
     phone: '',
   });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
 
   const submit = async (e) => {
     e.preventDefault();
@@ -312,7 +362,6 @@ function CheckoutModal({ product, user, guestEmail, onClose, onInitiated, onErro
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Could not start payment.'); setBusy(false); return; }
-      localStorage.setItem('fs_email', form.email.trim().toLowerCase());
       onInitiated(data.order_code);
     } catch {
       setError('Network error. Please try again.');
@@ -331,10 +380,6 @@ function CheckoutModal({ product, user, guestEmail, onClose, onInitiated, onErro
         <div className="field">
           <label htmlFor="co-name">Full name</label>
           <input id="co-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </div>
-        <div className="field">
-          <label htmlFor="co-email">Email (download link goes here)</label>
-          <input id="co-email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </div>
         <div className="field">
           <label htmlFor="co-phone">Mobile money phone number</label>
@@ -572,6 +617,27 @@ function PaymentResultModal({ result, user, guestEmail, onClose, onError }) {
       </Modal>
     );
   }
+
+  const [email, setEmail] = useState(user?.email || order.customer_email || guestEmail || '');
+  const [emailSent, setEmailSent] = useState(false);
+
+  const saveEmail = async () => {
+    const trimmed = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) { onError('Please enter a valid email.'); return; }
+    try {
+      const res = await fetch('/api/orders/update-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_code: order.order_code, email: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) { onError(data.error || 'Could not save email.'); return; }
+      setEmailSent(true);
+    } catch {
+      onError('Network error. Please try again.');
+    }
+  };
+
   return (
     <Modal onClose={onClose}>
       <div className="success-icon"><CheckIcon /></div>
@@ -580,11 +646,26 @@ function PaymentResultModal({ result, user, guestEmail, onClose, onError }) {
         Order <strong>{order.order_code}</strong> — {result.product?.title}<br />
         {ugx(order.amount_ugx)} paid via mobile money.
       </p>
-      <button className="btn btn-block" style={{ marginTop: 18 }}
-        onClick={() => requestDownload(order, user?.email || order.customer_email || guestEmail, onError)}>
-        <DownloadIcon /> Download now
-      </button>
-      <p className="form-note">Your download link is also available under My Orders.</p>
+      {!emailSent && (
+        <>
+          <p className="form-note" style={{ textAlign: 'left', margin: '10px 0 8px' }}>
+            Download your document to your phone, then enter your email to receive the download link.
+          </p>
+          <div className="field" style={{ marginBottom: 12 }}>
+            <input id="pr-email" type="email" placeholder="you@example.com" required
+              value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <button className="btn btn-block" style={{ marginTop: 10 }} onClick={saveEmail}>
+            Save email & send download link
+          </button>
+        </>
+      )}
+      {emailSent && (
+        <p className="form-note" style={{ textAlign: 'center', color: 'var(--teal)' }}>
+          Download link sent to <strong>{email}</strong>. You can also download again under My Orders.
+        </p>
+      )}
+      <button className="btn btn-block" style={{ marginTop: 16 }} onClick={onClose}>Close</button>
     </Modal>
   );
 }

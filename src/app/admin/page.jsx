@@ -149,6 +149,7 @@ function ProductForm({ product, onClose, onSaved }) {
     price_ugx: product?.price_ugx ?? '',
     file_format: product?.file_format || 'PDF',
     published: product?.published ?? 1,
+    is_free: product?.price_ugx === 0,
   });
   const [cover, setCover] = useState(null);
   const [file, setFile] = useState(null);
@@ -158,7 +159,7 @@ function ProductForm({ product, onClose, onSaved }) {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
-    if (isNew && !file) { setError('Please upload the product file.'); return; }
+    if (!form.is_free && !file) { setError('Please upload the product file.'); return; }
     setBusy(true);
     try {
       const fd = new FormData();
@@ -207,7 +208,16 @@ function ProductForm({ product, onClose, onSaved }) {
             <div className="field">
               <label htmlFor="pf-price">Price (UGX)</label>
               <input id="pf-price" type="number" min="0" step="1" required value={form.price_ugx}
-                onChange={(e) => setForm({ ...form, price_ugx: e.target.value })} />
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setForm({ ...form, price_ugx: v, is_free: Number(v) === 0 });
+                }} />
+            </div>
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.is_free} onChange={(e) => setForm({ ...form, is_free: e.target.checked, price_ugx: e.target.checked ? '0' : form.price_ugx || '0' })} />
+                Free product (no payment required — download instantly)
+              </label>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -230,13 +240,21 @@ function ProductForm({ product, onClose, onSaved }) {
               {cover ? <strong>{cover.name}</strong> : <>Click to choose an image — <strong>PNG, JPG or SVG</strong></>}
             </label>
           </div>
-          <div className="field">
-            <label>Product file {isNew ? '' : '(leave empty to keep current)'} — PDF, ZIP, DOCX, XLSX, PPTX, EPUB, TXT (max 200 MB)</label>
-            <label className="file-drop">
-              <input type="file" accept=".pdf,.zip,.docx,.doc,.xlsx,.pptx,.epub,.txt" onChange={(e) => setFile(e.target.files[0] || null)} />
-              {file ? <strong>{file.name}</strong> : <>Click to choose the file customers will download</>}
-            </label>
-          </div>
+          {form.is_free ? (
+            <div className="field">
+              <p className="form-note" style={{ margin: 0, color: 'var(--teal)' }}>
+                Free products don't require a file — customers download instantly after checkout.
+              </p>
+            </div>
+          ) : (
+            <div className="field">
+              <label>Product file {isNew ? '' : '(leave empty to keep current)'} — PDF, ZIP, DOCX, XLSX, PPTX, EPUB, TXT (max 200 MB)</label>
+              <label className="file-drop">
+                <input type="file" accept=".pdf,.zip,.docx,.doc,.xlsx,.pptx,.epub,.txt" onChange={(e) => setFile(e.target.files[0] || null)} />
+                {file ? <strong>{file.name}</strong> : <>Click to choose the file customers will download</>}
+              </label>
+            </div>
+          )}
           <button className="btn btn-block" disabled={busy}>{busy ? 'Saving...' : isNew ? 'Create product' : 'Save changes'}</button>
         </form>
       </div>

@@ -43,11 +43,12 @@ export async function GET(req) {
 function verifyFreeToken(token) {
   if (!token) return null;
   const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  const [prefix, productId, exp, sig] = parts;
-  if (prefix !== 'free') return null;
+  if (parts.length !== 2) return null;
+  const [payload, sig] = parts;
+  const kv = payload.split(':');
+  if (kv.length !== 3 || kv[0] !== 'free') return null;
+  const [, productId, exp] = kv;
   const secret = process.env.APP_SECRET || 'fileshelf-dev-secret-change-me';
-  const payload = `${prefix}:${productId}:${exp}`;
   const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);

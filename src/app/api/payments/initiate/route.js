@@ -17,8 +17,11 @@ export async function POST(req) {
 
   const product = await queryOne('SELECT * FROM products WHERE id = ? AND published = 1', [productId]);
   if (!product) return Response.json({ error: 'Product not found.' }, { status: 404 });
-  if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !/^\+256\d{9}$/.test(phone)) {
-    return Response.json({ error: 'Please provide your name, a valid email and a Ugandan phone number (e.g. 0772 123 456).' }, { status: 400 });
+  if (!name || !/^\+256\d{9}$/.test(phone)) {
+    return Response.json({ error: 'Please provide your name and a Ugandan phone number (e.g. 0772 123 456).' }, { status: 400 });
+  }
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return Response.json({ error: 'Please provide a valid email address.' }, { status: 400 });
   }
   if (!marzConfigured()) {
     return Response.json({ error: 'Payments are not configured yet. Please contact the store owner.' }, { status: 503 });
@@ -30,7 +33,7 @@ export async function POST(req) {
   const info = await execute(`INSERT INTO orders
     (order_code, product_id, user_id, customer_name, customer_email, customer_phone, amount_ugx, tx_ref)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [orderCode, product.id, user?.id || null, name, email, phone, product.price_ugx, tx_ref]
+    [orderCode, product.id, user?.id || null, name, email || '', phone, product.price_ugx, tx_ref]
   );
   const orderId = info.lastInsertRowid;
 

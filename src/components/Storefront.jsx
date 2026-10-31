@@ -564,6 +564,10 @@ function OrdersModal({ user, guestEmail, onClose, onRequireAuth, onError }) {
 }
 
 function PaymentResultModal({ result, user, guestEmail, onClose, onError }) {
+  // Hooks must be called unconditionally before any early returns
+  const [email, setEmail] = useState(user?.email || result?.order?.customer_email || guestEmail || '');
+  const [emailSent, setEmailSent] = useState(false);
+
   if (result?.cancelled) {
     return (
       <Modal onClose={onClose}>
@@ -595,9 +599,6 @@ function PaymentResultModal({ result, user, guestEmail, onClose, onError }) {
       </Modal>
     );
   }
-
-  const [email, setEmail] = useState(user?.email || order.customer_email || guestEmail || '');
-  const [emailSent, setEmailSent] = useState(false);
 
   const saveEmail = async () => {
     const trimmed = email.trim().toLowerCase();

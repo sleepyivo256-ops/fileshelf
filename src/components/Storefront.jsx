@@ -59,7 +59,7 @@ export default function Storefront() {
   const shown = filtered.slice(0, visible);
 
   const openProduct = (p) => setModal({ type: 'product', product: p });
-  const buyNow = (p) => p.price_ugx === 0 ? setModal({ type: 'free-download', product: p }) : setModal({ type: 'checkout', product: p });
+  const buyNow = (p) => setModal({ type: 'checkout', product: p });
   const closeModal = () => setModal(null);
 
   const afterAuth = (u) => { setUser(u); setModal({ type: 'orders' }); };
@@ -181,7 +181,7 @@ export default function Storefront() {
                     <div className="card-title">{p.title}</div>
                     <div className="card-cat">{p.category} · {p.file_format}</div>
                     <div className="card-price">{ugx(p.price_ugx)}</div>
-                    <button className="btn" onClick={(e) => { e.stopPropagation(); buyNow(p); }}>
+                    <button className="btn" onClick={(e) => { e.stopPropagation(); p.price_ugx === 0 ? handleFreeDownload(p, showToast) : buyNow(p); }}>
                       {p.price_ugx === 0 ? 'Download' : 'Buy Now'}
                     </button>
                   </div>
@@ -217,7 +217,7 @@ export default function Storefront() {
           <p className="pd-desc">{modal.product.description || 'A practical digital resource from FileShelf.'}</p>
           <div className="pd-price">{ugx(modal.product.price_ugx)}</div>
           {modal.product.price_ugx === 0 ? (
-            <button className="btn btn-block" onClick={() => setModal({ type: 'free-download', product: modal.product })}>
+            <button className="btn btn-block" onClick={() => handleFreeDownload(modal.product, showToast)}>
               Download now <ArrowRight />
             </button>
           ) : (
@@ -282,48 +282,6 @@ export default function Storefront() {
 
       {toast && <div className="toast">{toast}</div>}
     </>
-  );
-}
-
-function FreeDownloadModal({ product, onClose }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const download = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const res = await fetch('/api/download/free', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: product.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Download failed.'); setBusy(false); return; }
-      const a = document.createElement('a');
-      a.href = data.url;
-      a.download = true;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      onClose();
-    } catch {
-      setError('Network error. Please try again.');
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal onClose={onClose}>
-      <h3>Download {product.title}</h3>
-      <p className="form-note" style={{ textAlign: 'left', margin: '4px 0 16px' }}>
-        This is a free resource. Click below to download it directly to your phone.
-      </p>
-      {error && <div className="form-error">{error}</div>}
-      <button className="btn btn-block" disabled={busy} onClick={download}>
-        {busy ? 'Preparing download...' : 'Download now'}
-      </button>
-    </Modal>
   );
 }
 
@@ -518,6 +476,26 @@ async function requestDownload(order, email, onError) {
   document.body.appendChild(a);
   a.click();
   a.remove();
+}
+
+async function handleFreeDownload(product, onError) {
+  try {
+    const res = await fetch('/api/download/free', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: product.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) { onError(data.error || 'Download failed.'); return; }
+    const a = document.createElement('a');
+    a.href = data.url;
+    a.download = true;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch {
+    onError('Network error. Please try again.');
+  }
 }
 
 function OrdersModal({ user, guestEmail, onClose, onRequireAuth, onError }) {

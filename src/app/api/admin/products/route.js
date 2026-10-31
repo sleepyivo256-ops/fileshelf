@@ -27,19 +27,15 @@ export async function POST(req) {
       !Number.isFinite(price) || price < 0) {
     return Response.json({ error: 'Title, a valid category and price are required.' }, { status: 400 });
   }
+  if (!file || typeof file === 'string' || file.size === 0) {
+    return Response.json({ error: 'Please upload the product file.' }, { status: 400 });
+  }
 
-  // Free products don't require a file upload; paid products do.
-  const isFree = price === 0;
   let coverPath = '';
   let saved;
   try {
     coverPath = cover && typeof cover !== 'string' && cover.size > 0 ? await saveCover(cover) : '';
-    if (!isFree) {
-      if (!file || typeof file === 'string' || file.size === 0) {
-        return Response.json({ error: 'Please upload the product file.' }, { status: 400 });
-      }
-      saved = await saveProductFile(file);
-    }
+    saved = await saveProductFile(file);
   } catch (e) {
     return Response.json({ error: e.message || 'Upload failed.' }, { status: e.status || 500 });
   }
@@ -48,7 +44,7 @@ export async function POST(req) {
     (title, description, category, price_ugx, file_format, cover_path, file_path, file_name, file_size, published)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [title, description, category, Math.round(price), fileFormat, coverPath,
-      isFree ? '' : saved.relPath, isFree ? '' : saved.fileName, isFree ? 0 : saved.size, published]
+      saved.relPath, saved.fileName, saved.size, published]
   );
 
   return Response.json({ id: info.lastInsertRowid });
